@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,6 +29,17 @@ class CertificateRegistryServiceTest {
 		service.record(event);
 
 		verify(repository, never()).saveAndFlush(isA(RegisteredCertificate.class));
+	}
+
+	@Test
+	void processingTheSameMessageTwiceStoresOneRow() {
+		CertificateIssuedEvent event = newEvent();
+		when(repository.existsById(event.eventId())).thenReturn(false, true);
+
+		service.record(event);
+		service.record(event);
+
+		verify(repository, times(1)).saveAndFlush(isA(RegisteredCertificate.class));
 	}
 
 	@Test

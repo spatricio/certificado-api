@@ -1,13 +1,12 @@
 package com.sergio.certificado.emissor.certificate;
 
 import com.sergio.certificado.contract.CertificateIssuedEvent;
+import com.sergio.certificado.emissor.outbox.OutboxEvent;
+import com.sergio.certificado.emissor.outbox.OutboxEventRepository;
 import org.junit.jupiter.api.Test;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
-import static com.sergio.certificado.emissor.config.MessagingConfiguration.QUEUE_NAME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
@@ -17,8 +16,8 @@ class CertificateServiceTest {
 	@Test
 	void persistsCertificateAndPublishesItsEvent() {
 		CertificateRepository repository = mock(CertificateRepository.class);
-		RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
-		CertificateService service = new CertificateService(repository, rabbitTemplate);
+		OutboxEventRepository outboxRepository = mock(OutboxEventRepository.class);
+		CertificateService service = new CertificateService(repository, outboxRepository);
 
 		CertificateResponse response = service.issue(new CreateCertificateRequest("Ana Silva", "Introducao a APIs"));
 
@@ -26,6 +25,6 @@ class CertificateServiceTest {
 		assertNotNull(response.codigoValidacao());
 		assertEquals("Ana Silva", response.participante());
 		verify(repository).save(isA(Certificate.class));
-		verify(rabbitTemplate).convertAndSend(eq(QUEUE_NAME), isA(CertificateIssuedEvent.class));
+		verify(outboxRepository).save(isA(OutboxEvent.class));
 	}
 }

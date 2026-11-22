@@ -1,24 +1,23 @@
 package com.sergio.certificado.emissor.certificate;
 
 import com.sergio.certificado.contract.CertificateIssuedEvent;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import com.sergio.certificado.emissor.outbox.OutboxEvent;
+import com.sergio.certificado.emissor.outbox.OutboxEventRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.UUID;
 
-import static com.sergio.certificado.emissor.config.MessagingConfiguration.QUEUE_NAME;
-
 @Service
 public class CertificateService {
 
 	private final CertificateRepository repository;
-	private final RabbitTemplate rabbitTemplate;
+	private final OutboxEventRepository outboxRepository;
 
-	public CertificateService(CertificateRepository repository, RabbitTemplate rabbitTemplate) {
+	public CertificateService(CertificateRepository repository, OutboxEventRepository outboxRepository) {
 		this.repository = repository;
-		this.rabbitTemplate = rabbitTemplate;
+		this.outboxRepository = outboxRepository;
 	}
 
 	@Transactional
@@ -30,13 +29,14 @@ public class CertificateService {
 				certificateId, validationCode, request.participante(), request.curso(), issuedAt);
 
 		repository.save(certificate);
-		rabbitTemplate.convertAndSend(QUEUE_NAME, new CertificateIssuedEvent(
+		CertificateIssuedEvent event = new CertificateIssuedEvent(
 				UUID.randomUUID(),
 				certificateId,
 				validationCode,
 				request.participante(),
 				request.curso(),
-				issuedAt));
+				issuedAt);
+		outboxRepository.save(new OutboxEvent(event));
 
 		return toResponse(certificate);
 	}

@@ -1,8 +1,11 @@
-# ADR 0002: RabbitMQ e processamento idempotente
+# ADR 0002: fila RabbitMQ, outbox e processamento idempotente
 
 - Status: Aceita
-- Decisao: publicar eventos persistentes na fila duravel `certificado.emitido`; deduplicar no Gravador pela chave unica `eventId` gravada no banco dele.
-- Contexto: o Emissor e o Gravador precisam trocar mensagens sem compartilhar banco, e uma mensagem pode ser entregue mais de uma vez.
-- Alternativas: Kafka; chamada HTTP sincronica; fila em memoria; deduplicacao apenas em cache.
-- Motivo: RabbitMQ e suficiente para uma fila de trabalho simples e funciona no perfil Docker. A restricao unica no PostgreSQL continua protegendo contra duplicatas mesmo depois que o cache expira ou o processo reinicia. O listener confirma a mensagem depois do processamento; uma falha deixa a mensagem elegivel para reentrega.
-- Consequencia conhecida: gravar no banco do Emissor e publicar na fila nao formam uma transacao atomica. Uma etapa futura pode introduzir o padrao outbox e uma DLQ para aumentar a resiliencia operacional.
+- Decisao: o Emissor grava o certificado e o evento pendente na mesma transacao PostgreSQL. Um publicador envia eventos do outbox como mensagens persistentes para a fila duravel `certificado.emitido`, aguardando confirmacao do RabbitMQ antes de marcar o evento como publicado. O Gravador consome e deduplica pelo `eventId`, que e a chave primaria no banco dele.
+- Contexto: os servicos precisam comunicar-se sem compartilhar banco. O gravador pode receber a mesma mensagem mais de uma vez, e uma queda do emissor nao pode perder um evento ja aceito pela API.
+- Alternativas: chamada HTTP sincronica; fila em memoria; Kafka; publicar diretamente durante a transacao e aceitar a janela entre o commit do banco e o envio.
+- Motivo: HTTP sincronico acoplaria a disponibilidade e o tempo de resposta dos dois servicos. RabbitMQ desacopla produtor e consumidor. O outbox elimina a janela entre salvar o certificado e registrar que seu evento deve ser publicado. Confirmacoes do broker e mensagens persistentes evitam marcar como publicado algo que o RabbitMQ nao aceitou. Se o processo cair depois do envio confirmado e antes de marcar o outbox, o mesmo evento pode ser enviado novamente; a chave unica do Gravador torna essa repeticao segura.
+- Garantia de entrega: **pelo menos uma vez**. Enquanto o outbox permanecer no banco, o publicador tenta novamente eventos sem confirmacao. O RabbitMQ usa fila duravel e mensagens persistentes; o Gravador so confirma a mensagem depois que o processamento e a gravacao no banco terminam. Reentregas sao esperadas, nao perdas silenciosas; deduplicar pelo `eventId` garante uma linha por evento.
+- Idempotencia: o Gravador verifica se o `eventId` ja existe antes de gravar, e o banco aplica uma restricao unica. Essa restricao tambem cobre duas entregas concorrentes.
+- Teste manual: em `http://localhost:15672`, abra **Exchanges** > **(AMQP default)** > **Publish message**. Publique o mesmo JSON do README duas vezes com `content_type` igual a `application/json` e cabecalho `__TypeId__` igual a `com.sergio.certificado.contract.CertificateIssuedEvent`. Confira que `messages_ready` volta a zero e que a consulta SQL pelo `event_id` retorna `count = 1`. A publicacao feita pela aplicacao usa mensagens persistentes.
+- Consequencias: o outbox publicado e mantido para auditoria nesta etapa. Retry com backoff e uma dead-letter queue podem ser adicionados em uma proxima etapa.
