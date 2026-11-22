@@ -1,0 +1,106 @@
+services:
+  db-emissor:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: emissor
+      POSTGRES_USER: ${POSTGRES_USER:-certificado}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-only}
+    ports:
+      - "5433:5432"
+    volumes:
+      - emissor-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  db-gravador:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: gravador
+      POSTGRES_USER: ${POSTGRES_USER:-certificado}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-only}
+    ports:
+      - "5434:5432"
+    volumes:
+      - gravador-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-certificado}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-local-dev-only}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  emissor:
+    build:
+      context: .
+      dockerfile: emissor/Dockerfile
+    environment:
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db-emissor:5432/emissor
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-certificado}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-only}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-certificado}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-local-dev-only}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db-emissor:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  gravador:
+    build:
+      context: .
+      dockerfile: gravador/Dockerfile
+    environment:
+      SERVER_PORT: 8081
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db-gravador:5432/gravador
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-certificado}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-only}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-certificado}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-local-dev-only}
+      SPRING_DATA_REDIS_HOST: redis
+    ports:
+      - "8081:8081"
+    depends_on:
+      db-gravador:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  emissor-db-data:
+  gravador-db-data:
+  redis-data:
