@@ -17,6 +17,10 @@
     {
       "key": "validationCode",
       "value": ""
+    },
+    {
+      "key": "certificateId",
+      "value": ""
     }
   ],
   "item": [
@@ -69,7 +73,48 @@
               "    pm.expect(body.codigoValidacao).to.be.a('string').and.not.empty;",
               "    pm.expect(body.participante).to.eql('Ana Silva');",
               "    pm.expect(body.curso).to.eql('Introducao a APIs');",
+              "    pm.collectionVariables.set('certificateId', body.id);",
               "    pm.collectionVariables.set('validationCode', body.codigoValidacao);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Consultar certificado por ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{gravadorUrl}}/api/certificados/{{certificateId}}",
+          "host": [
+            "{{gravadorUrl}}"
+          ],
+          "path": [
+            "api",
+            "certificados",
+            "{{certificateId}}"
+          ]
+        },
+        "description": "Consulta o certificado registrado pelo ID retornado pelo Emissor. Como o processamento da fila e assincrono, aguarde alguns segundos se receber HTTP 404 logo apos a emissao."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('A consulta por ID retorna HTTP 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('A resposta corresponde ao ID emitido', function () {",
+              "    const body = pm.response.json();",
+              "",
+              "    pm.expect(body.id).to.eql(pm.collectionVariables.get('certificateId'));",
+              "    pm.expect(body.codigoValidacao).to.eql(pm.collectionVariables.get('validationCode'));",
               "});"
             ]
           }

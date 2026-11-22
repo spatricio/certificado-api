@@ -2,9 +2,12 @@ package com.sergio.certificado.gravador.certificate;
 
 import com.sergio.certificado.contract.CertificateIssuedEvent;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+
+import java.util.UUID;
 
 @Service
 public class CertificateRegistryService {
@@ -15,7 +18,10 @@ public class CertificateRegistryService {
 		this.repository = repository;
 	}
 
-	@CacheEvict(cacheNames = "certificados", key = "#event.validationCode")
+	@Caching(evict = {
+			@CacheEvict(cacheNames = "certificados-por-codigo", key = "#event.validationCode"),
+			@CacheEvict(cacheNames = "certificados-por-id", key = "#event.certificateId")
+	})
 	public void record(CertificateIssuedEvent event) {
 		if (repository.existsById(event.eventId())) {
 			return;
@@ -36,10 +42,21 @@ public class CertificateRegistryService {
 		}
 	}
 
-	@Cacheable(cacheNames = "certificados", key = "#validationCode")
+	@Cacheable(cacheNames = "certificados-por-codigo", key = "#validationCode")
 	public CertificateLookupResponse findByValidationCode(String validationCode) {
 		RegisteredCertificate certificate = repository.findByValidationCode(validationCode)
 				.orElseThrow(CertificateNotFoundException::new);
+		return toResponse(certificate);
+	}
+
+	@Cacheable(cacheNames = "certificados-por-id", key = "#certificateId")
+	public CertificateLookupResponse findByCertificateId(UUID certificateId) {
+		RegisteredCertificate certificate = repository.findByCertificateId(certificateId)
+				.orElseThrow(CertificateNotFoundException::new);
+		return toResponse(certificate);
+	}
+
+	private CertificateLookupResponse toResponse(RegisteredCertificate certificate) {
 		return new CertificateLookupResponse(
 				certificate.getCertificateId(),
 				certificate.getValidationCode(),

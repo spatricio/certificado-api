@@ -1,7 +1,7 @@
 package com.sergio.certificado.gravador.certificate;
 
-import java.time.Instant;
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.UUID;
 
 public record CertificateLookupResponse(

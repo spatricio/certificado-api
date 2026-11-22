@@ -8,4 +8,6 @@ import java.util.UUID;
 public interface RegisteredCertificateRepository extends JpaRepository<RegisteredCertificate, UUID> {
 
 	Optional<RegisteredCertificate> findByValidationCode(String validationCode);
+
+	Optional<RegisteredCertificate> findByCertificateId(UUID certificateId);
 }

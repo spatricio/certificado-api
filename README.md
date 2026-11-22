@@ -6,7 +6,7 @@ Projeto em Java 17 e Spring Boot para emitir certificados de forma assincrona e 
 
 1. O **Emissor** recebe os dados do participante e do curso, grava o certificado no seu proprio PostgreSQL e publica um evento na fila `certificado.emitido`.
 2. O **Gravador** consome o evento e registra o certificado no PostgreSQL dele. O identificador do evento e unico; mensagens repetidas nao criam outro registro.
-3. O Gravador permite consultar o certificado pelo codigo de validacao. O Redis guarda consultas encontradas por ate **5 minutos**. A entrada e removida quando o Gravador processa um evento daquele codigo e tambem expira automaticamente ao fim do prazo.
+3. O Gravador permite consultar o certificado pelo ID ou pelo codigo de validacao. O Redis guarda apenas consultas encontradas por ate **5 minutos**. As entradas expiram automaticamente e sao invalidadas quando o Gravador processa um evento correspondente.
 
 O Emissor grava o certificado e o evento pendente no mesmo banco e transacao. Um publicador envia o outbox ao RabbitMQ e so marca o evento como publicado depois da confirmacao do broker. O Gravador confirma a mensagem depois de concluir a gravacao; uma falha pode causar reentrega, mas nao perda silenciosa. O `eventId` e uma chave unica no banco do Gravador, tornando o processamento idempotente.
 
@@ -14,9 +14,9 @@ O Emissor grava o certificado e o evento pendente no mesmo banco e transacao. Um
 
 Importe [`postman/Certificado-API.postman_collection.json`](postman/Certificado-API.postman_collection.json) no Postman. Com os servicos iniciados por Docker Compose, execute as requisicoes nesta ordem:
 
-1. **Emitir certificado**: envia um exemplo ao Emissor (`localhost:8080`) e salva automaticamente o codigo retornado na variavel `validationCode` da colecao.
-2. **Consultar certificado emitido**: consulta o Gravador (`localhost:8081`) usando o codigo salvo. Como a fila e assincrona, aguarde alguns segundos e tente novamente se a mensagem ainda nao tiver sido processada.
-3. **Consultar codigo inexistente (espera 404)**: confirma que um codigo desconhecido retorna `404 Not Found`.
+1. **Emitir certificado**: envia um exemplo ao Emissor (`localhost:8080`) e salva automaticamente o ID e o codigo retornados nas variaveis da colecao.
+2. **Consultar certificado por ID** ou **por codigo de validacao**: consulta o Gravador (`localhost:8081`). Como a fila e assincrona, aguarde alguns segundos e tente novamente se a mensagem ainda nao tiver sido processada.
+3. **Consultar codigo inexistente (espera 404)**: confirma que uma consulta desconhecida retorna `404 Not Found` e nao e guardada no cache.
 
 As variaveis `emissorUrl` e `gravadorUrl` estao definidas na colecao e podem ser alteradas para outros enderecos locais.
 
@@ -104,6 +104,7 @@ O endpoint retorna `202 Accepted` com o identificador e o codigo de validacao. O
 
 ```powershell
 curl.exe http://localhost:8081/api/validacoes/CODIGO_RETORNADO
+curl.exe http://localhost:8081/api/certificados/ID_RETORNADO
 ```
 
 ## Testes
