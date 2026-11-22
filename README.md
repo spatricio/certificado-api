@@ -10,6 +10,16 @@ Projeto em Java 17 e Spring Boot para emitir certificados de forma assincrona e 
 
 O Gravador confirma a mensagem ao RabbitMQ somente depois de concluir o processamento. A deduplicacao no banco protege contra reentregas da fila.
 
+## Testar pelo Postman
+
+Importe [`postman/Certificado-API.postman_collection.json`](postman/Certificado-API.postman_collection.json) no Postman. Com os servicos iniciados por Docker Compose, execute as requisicoes nesta ordem:
+
+1. **Emitir certificado**: envia um exemplo ao Emissor (`localhost:8080`) e salva automaticamente o codigo retornado na variavel `validationCode` da colecao.
+2. **Consultar certificado emitido**: consulta o Gravador (`localhost:8081`) usando o codigo salvo. Como a fila e assincrona, aguarde alguns segundos e tente novamente se a mensagem ainda nao tiver sido processada.
+3. **Consultar codigo inexistente (espera 404)**: confirma que um codigo desconhecido retorna `404 Not Found`.
+
+As variaveis `emissorUrl` e `gravadorUrl` estao definidas na colecao e podem ser alteradas para outros enderecos locais.
+
 ## Desenho
 
 ```mermaid

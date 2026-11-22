@@ -1,0 +1,155 @@
+{
+  "info": {
+    "_postman_id": "872e7b4e-b559-4f2e-aa6f-76fda50d8a1f",
+    "name": "API de Emissao de Certificados",
+    "description": "Emite um certificado e consulta seu registro assincrono no Gravador. Execute primeiro a emissao, aguarde a resposta e depois consulte o certificado.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "emissorUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "gravadorUrl",
+      "value": "http://localhost:8081"
+    },
+    {
+      "key": "validationCode",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Emitir certificado",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"participante\": \"Ana Silva\",\n  \"curso\": \"Introducao a APIs\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{emissorUrl}}/api/certificados",
+          "host": [
+            "{{emissorUrl}}"
+          ],
+          "path": [
+            "api",
+            "certificados"
+          ]
+        },
+        "description": "Emite um certificado. O script valida a resposta e salva o codigo de validacao como variavel da colecao."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('A emissao retorna HTTP 202 Accepted', function () {",
+              "    pm.response.to.have.status(202);",
+              "});",
+              "",
+              "pm.test('A resposta contem os dados do certificado e salva o codigo', function () {",
+              "    const body = pm.response.json();",
+              "",
+              "    pm.expect(body.id).to.be.a('string').and.not.empty;",
+              "    pm.expect(body.codigoValidacao).to.be.a('string').and.not.empty;",
+              "    pm.expect(body.participante).to.eql('Ana Silva');",
+              "    pm.expect(body.curso).to.eql('Introducao a APIs');",
+              "    pm.collectionVariables.set('validationCode', body.codigoValidacao);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Consultar certificado emitido",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{gravadorUrl}}/api/validacoes/{{validationCode}}",
+          "host": [
+            "{{gravadorUrl}}"
+          ],
+          "path": [
+            "api",
+            "validacoes",
+            "{{validationCode}}"
+          ]
+        },
+        "description": "Consulte depois de emitir. Como o processamento da fila e assincrono, aguarde alguns segundos se receber HTTP 404 logo apos a emissao."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('A consulta retorna HTTP 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('O certificado consultado corresponde ao codigo emitido', function () {",
+              "    const body = pm.response.json();",
+              "",
+              "    pm.expect(body.codigoValidacao).to.eql(pm.collectionVariables.get('validationCode'));",
+              "    pm.expect(body.id).to.be.a('string').and.not.empty;",
+              "    pm.expect(body.participante).to.eql('Ana Silva');",
+              "    pm.expect(body.curso).to.eql('Introducao a APIs');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Consultar codigo inexistente (espera 404)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{gravadorUrl}}/api/validacoes/codigo-inexistente",
+          "host": [
+            "{{gravadorUrl}}"
+          ],
+          "path": [
+            "api",
+            "validacoes",
+            "codigo-inexistente"
+          ]
+        },
+        "description": "Verifica a resposta para um codigo que nao existe."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Um codigo inexistente retorna HTTP 404 Not Found', function () {",
+              "    pm.response.to.have.status(404);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
